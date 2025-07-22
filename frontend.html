@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="wivendth=device-width, initial-scale=1.0">
+    <title>Nandha's Buddy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .header h1 {
+            color: #4a5568;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .bot-message {
+            background: #f7fafc;
+            color: #2d3748;
+            border: 1px solid #e2e8f0;
+        }
+
+        .emotion-badge {
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .suggestions {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: #4a5568;
+        }
+
+        .suggestions ul {
+            margin-left: 15px;
+            margin-top: 5px;
+        }
+
+        .suggestions li {
+            margin-bottom: 2px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-area input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .send-btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            color: #718096;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        .clear-btn {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            align-self: flex-end;
+        }
+
+        .clear-btn:hover {
+            background: #c53030;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>🤖 Nandha's Buddy</h1>
+            <p>Powered by Groq Cloud - I'm here to understand and support your emotions</p>
+        </div>
+        
+        <button class="clear-btn" onclick="clearChat()">Clear Chat</button>
+        
+        <div class="messages" id="messages">
+            <div class="message bot-message">
+                <div class="emotion-badge">neutral</div>
+                <div>Hello! I'm your emotional AI companion. I'm here to listen, understand your feelings, and offer support. How are you feeling today?</div>
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Share how you're feeling..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            messageInput.value = '';
+            
+            // Disable send button and show loading
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Add bot response to chat
+                addBotMessage(data.response, data.detected_emotion, data.suggested_actions);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                addBotMessage(
+                    "I'm sorry, I'm having trouble connecting right now. Please make sure the server is running and try again.", 
+                    "error", 
+                    ["Check if the server is running", "Verify your internet connection"]
+                );
+            } finally {
+                // Re-enable send button
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        function addMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = message;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addBotMessage(message, emotion, suggestions) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            
+            const emotionBadge = document.createElement('div');
+            emotionBadge.className = 'emotion-badge';
+            emotionBadge.textContent = emotion;
+            
+            // Set emotion badge color based on emotion
+            const emotionColors = {
+                'happy': '#48bb78', 'excited': '#ed8936',
+                'sad': '#4299e1', 'anxious': '#9f7aea',
+                'angry': '#f56565', 'stressed': '#ed8936',
+                'lonely': '#4299e1', 'grateful': '#48bb78',
+                'worried': '#9f7aea', 'calm': '#48bb78',
+                'neutral': '#718096'
+            };
+            emotionBadge.style.backgroundColor = emotionColors[emotion] || '#718096';
+            
+            const messageText = document.createElement('div');
+            messageText.textContent = message;
+            
+            messageDiv.appendChild(emotionBadge);
+            messageDiv.appendChild(messageText);
+            
+            // Add suggestions if available
+            if (suggestions && suggestions.length > 0) {
+                const suggestionsDiv = document.createElement('div');
+                suggestionsDiv.className = 'suggestions';
+                suggestionsDiv.innerHTML = '<strong>💡 Suggestions:</strong>';
+                
+                const suggestionsList = document.createElement('ul');
+                suggestions.forEach(suggestion => {
+                    const li = document.createElement('li');
+                    li.textContent = suggestion;
+                    suggestionsList.appendChild(li);
+                });
+                
+                suggestionsDiv.appendChild(suggestionsList);
+                messageDiv.appendChild(suggestionsDiv);
+            }
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearChat() {
+            const botMessages = messagesDiv.querySelectorAll('.bot-message:not(:first-child)');
+            const userMessages = messagesDiv.querySelectorAll('.user-message');
+            
+            botMessages.forEach(msg => msg.remove());
+            userMessages.forEach(msg => msg.remove());
+        }
+
+        // Focus on input when page loads
+        window.onload = function() {
+            messageInput.focus();
+        };
+    </script>
+</body>
+</html>
